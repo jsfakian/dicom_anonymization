@@ -1,0 +1,6 @@
+.godo
+.vscode
+.DS_Store
+ANON_*
+build/
+dist/

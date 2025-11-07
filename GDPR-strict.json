@@ -1,0 +1,16 @@
+{
+    "PatientName": "ANON",
+    "PatientID": "PSEUDO",
+    "PatientBirthDate": null,
+    "PatientSex": null,
+    "InstitutionName": null,
+    "ReferringPhysicianName": null,
+    "AccessionNumber": null,
+    "StudyID": "STUDY",
+    "StudyInstanceUID": "NEWUID",
+    "SeriesInstanceUID": "NEWUID",
+    "FrameOfReferenceUID": "NEWUID",
+    "KeepPrivateTags": false,
+    "PixelBlackout": true,
+    "RetainStudyDate": false
+}

@@ -1,0 +1,14 @@
+{
+  "PatientName": "PSEUDO",
+  "PatientID": "PSEUDO",
+  "PatientBirthDate": null,
+  "PatientSex": null,
+  "InstitutionName": "DEID_CENTER",
+  "StudyID": "RESEARCH",
+  "StudyInstanceUID": "PSEUDOUID",
+  "SeriesInstanceUID": "PSEUDOUID",
+  "FrameOfReferenceUID": "PSEUDOUID",
+  "KeepPrivateTags": false,
+  "PixelBlackout": false,
+  "RetainStudyDate": true
+}
