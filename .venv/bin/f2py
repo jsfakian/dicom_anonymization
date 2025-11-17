@@ -1,4 +1,4 @@
-#!/Users/jsfakian/Documents/src/dycom_anonymization/.venv/bin/python3.12
+#!/Users/jsfakian/Documents/src/dicom_anonymization/.venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

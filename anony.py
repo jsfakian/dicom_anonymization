@@ -14,12 +14,21 @@ from pydicom import dcmread
 from pydicom.dataset import Dataset
 from pydicom.uid import UID, generate_uid
 from pydicom.errors import InvalidDicomError
-from pydicom.datadict import keyword_for_name
+from pydicom.datadict import DicomDictionary
+
 import cv2
 import json
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
+
+NAME_TO_KEYWORD: Dict[str, str] = {}
+for _tag, entry in DicomDictionary.items():
+    # entry = (VR, VM, name, is_retired, keyword)
+    name = entry[2]
+    keyword = entry[4]
+    if name and keyword:
+        NAME_TO_KEYWORD[name] = keyword
 
 # =========================== USER-EDITABLE CONFIG ============================
 
@@ -132,6 +141,14 @@ def _clean_attr_name(name: str) -> str:
     parts = name.split()
     return " ".join(parts)
 
+def keyword_for_name(attr_name: str) -> str | None:
+    """
+    Map DICOM Attribute Name (e.g. "Patient's Name")
+    to pydicom keyword (e.g. "PatientName").
+    Returns None if not found.
+    """
+    return NAME_TO_KEYWORD.get(attr_name)
+
 
 def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[Dataset, Dict[str, Tuple[Any, Any]], str]:
     """
@@ -166,7 +183,11 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
             # Unknown or non-standard attribute name; skip safely
             continue
 
-        old_val = ds.get(kw).value if kw in ds else None
+        old_val = None
+        try:
+            old_val = ds.get(kw).value
+        except:
+            print (f"Warning: could not read attribute '{attr_name}' ({kw});")
         new_val = old_val  # default if KEEP or unknown action
 
         # Interpret action
@@ -247,7 +268,9 @@ def process_one(args: Tuple[str, str, Dict[str, Any], str, str]) -> Optional[Tup
     try:
         ds, audit, pid = anonymize_dataset(ds, profile, salt)
     except Exception as e:
+        import traceback
         print(f"Error anonymizing {in_path}: {e}")
+        traceback.print_exc()
         return None
 
     out_dir = os.path.join(out_root, "DICOM", pid)

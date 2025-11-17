@@ -45,7 +45,7 @@ pip install pydicom numpy opencv-python pyinstaller
 
 ```
 pyinstaller --noconfirm --onefile --windowed \
-  --name DICOM-DeID anonymizer_pro.py
+  --name DICOM-DeID anony.py
 ```
 
 ## GUI Usage
@@ -53,7 +53,7 @@ pyinstaller --noconfirm --onefile --windowed \
 To start the graphical application:
 
 ```bash
-python dicom_anonymize_pro_gui.py
+python anony.py
 ```
 
 | Field                | Description                                              |
@@ -66,7 +66,7 @@ python dicom_anonymize_pro_gui.py
 ## Command-line usage
 
 Basic example:
-python anonymizer_pro.py --input data.csv --output data.anonymized.csv \
+python anony.py --input data.csv --output data.anonymized.csv \
     --columns name,email --strategy hash --salt my-secret-salt
 
 Typical options (may vary slightly depending on implementation):
@@ -77,7 +77,7 @@ Typical options (may vary slightly depending on implementation):
 - --salt VALUE         Salt or key for deterministic transformations
 
 ```
-python anonymize_pro.py \
+python anony.py \
   -i /path/to/dicom_or_folder \
   -o /path/to/output \
   -p GDPR-strict.json \
