@@ -185,9 +185,10 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
 
         old_val = None
         try:
-            old_val = ds.get(kw).value
+            old_val = ds.get(kw)
         except:
-            print (f"Warning: could not read attribute '{attr_name}' ({kw});")
+            pass
+            #print (f"Warning: could not read attribute '{attr_name}' ({kw});")
         new_val = old_val  # default if KEEP or unknown action
 
         # Interpret action
