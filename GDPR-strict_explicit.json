@@ -462,5 +462,5 @@
     "KeepPrivateTags": false,
     "PixelBlackout": true,
 	"Pixel Data": "KEEP",
-    "RetainStudyDate": false
+    "RetainStudyDate": null
 }

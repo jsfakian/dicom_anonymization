@@ -210,12 +210,12 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
         new_val = old_val  # default: keep as-is
 
         # 1) No rule in profile -> KEEP unchanged
-        if action is NO_RULE:
-            audit[attr_name] = (old_val, new_val)
-            if attr_name == "Group Length":
-                print(f"{attr_name} tag {de.tag} and is action NO_RULE: {action == NO_RULE}.")
-                print(f"{attr_name}: {audit[attr_name]}")
-            continue
+        #if action is NO_RULE:
+        #    audit[attr_name] = (old_val, new_val)
+        #    if attr_name == "Group Length":
+        #        print(f"{attr_name} tag {de.tag} and is action NO_RULE: {action == NO_RULE}.")
+        #        print(f"{attr_name}: {audit[attr_name]}")
+        #    continue
 
         # 2) Rule exists and is JSON null -> delete
         if action is None:

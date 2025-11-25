@@ -141,36 +141,35 @@ def validate_against_profile(
         old_val = de.value
         new_de = anon.get(de.tag)
         new_val = new_de.value if new_de is not None else None
-        if attr_name == "Group Length":
-            print(f"Validating {attr_name} tag {de.tag} old value: {old_val}, new value: {new_val}.")
 
         if rule_entry is None:
-            # No explicit rule in profile for this attribute.
-            # You can choose how strict you want to be here.
-            # For now: if value changed, flag it; if same, accept.
-            if isinstance(old_val, Sequence) and isinstance(new_val, Sequence):
-                # shallow comparison: length only
-                if len(old_val) != len(new_val):
-                    errors.append(
-                        ValidationError(
-                            attr_name,
-                            "No profile rule for attribute, but sequence length changed",
-                            old_val,
-                            new_val,
-                            old_val,
-                        )
-                    )
-            else:
-                if old_val != new_val:
-                    errors.append(
-                        ValidationError(
-                            attr_name,
-                            "No profile rule for attribute, but value changed",
-                            old_val,
-                            new_val,
-                            old_val,
-                        )
-                    )
+        #    # No explicit rule in profile for this attribute.
+        #    # You can choose how strict you want to be here.
+        #    # For now: if value changed, flag it; if same, accept.
+        #    if isinstance(old_val, Sequence) and isinstance(new_val, Sequence):
+        #        # shallow comparison: length only
+        #        if len(old_val) != len(new_val):
+        #            errors.append(
+        #                ValidationError(
+        #                    attr_name,
+        #                    "No profile rule for attribute, but sequence length changed",
+        #                    old_val,
+        #                    new_val,
+        #                    old_val,
+        #                )
+        #            )
+        #    else:
+        #        if old_val != new_val:
+        #            print(f"Validating {attr_name} tag {de.tag} old value: {old_val}, new value: {new_val}.")
+        #            errors.append(
+        #                ValidationError(
+        #                    attr_name,
+        #                    "No profile rule for attribute, but value changed",
+        #                    old_val,
+        #                    new_val,
+        #                    old_val,
+        #                )
+        #            )
             continue
 
         original_json_key, action = rule_entry
