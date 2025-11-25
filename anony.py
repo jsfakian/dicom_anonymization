@@ -8,6 +8,7 @@ import datetime
 import hashlib
 import multiprocessing as mp
 from typing import Tuple, Dict, Any, Optional, List
+from itertools import chain
 
 import numpy as np
 from pydicom import dcmread
@@ -185,91 +186,121 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
 
     audit: Dict[str, Tuple[Any, Any]] = {}
 
-    # Pseudonymous PatientID used for PSEUDO / PSEUDOUID
+    # Pseudonymous PatientID
     real_pid = str(getattr(ds, "PatientID", "UNKNOWN"))
     pseudo_pid = make_pseudo_patient_id(real_pid, salt)
 
-    # Build normalized profile mapping: cleaned attribute name -> action
+    # Cleaned rule map: human attribute name → action
     norm_profile = build_normalized_profile(profile)
 
-    # Iterate over a copy of keys since we may delete tags
-    for tag in list(ds.keys()):
-        de = ds[tag]
+    # Combine file_meta + dataset elements
+    iterable = chain(list(ds.file_meta), list(ds.iterall()))
 
-        # We'll handle private tags globally later
-        if de.tag.is_private:
+    for de in iterable:
+        tag = de.tag
+
+        # ===============================
+        # Skip private tags
+        # ===============================
+        if tag.is_private:
             continue
 
-        attr_name_raw = de.name           # e.g. "Patient's Name"
+        # ===============================
+        # Prepare names and lookup action
+        # ===============================
+        attr_name_raw = de.name
         attr_name = _clean_attr_name(attr_name_raw)
-
-        # Distinguish between "no rule at all" and "rule with null"
         action = norm_profile.get(attr_name, NO_RULE)
 
         old_val = de.value
-        new_val = old_val  # default: keep as-is
+        new_val = old_val
 
-        # 1) No rule in profile -> KEEP unchanged
-        #if action is NO_RULE:
-        #    audit[attr_name] = (old_val, new_val)
-        #    if attr_name == "Group Length":
-        #        print(f"{attr_name} tag {de.tag} and is action NO_RULE: {action == NO_RULE}.")
-        #        print(f"{attr_name}: {audit[attr_name]}")
-        #    continue
-
-        # 2) Rule exists and is JSON null -> delete
-        if action is None:
-            if tag in ds:
-                del ds[tag]
-            new_val = "<removed>"
+        # ===============================
+        # (1) If NO RULE → KEEP
+        # ===============================
+        if action is NO_RULE:
+            audit[attr_name] = (old_val, new_val)
             continue
 
-        # 3) Rule is a string: KEEP / PSEUDO / NEWUID / PSEUDOUID / literal
+        # ===============================
+        # (2) If null → delete
+        # ===============================
+        if action is None:
+            if tag in ds.file_meta:
+                del ds.file_meta[tag]
+            elif tag in ds:
+                del ds[tag]
+
+            new_val = "<removed>"
+            audit[attr_name] = (old_val, new_val)
+            continue
+
+        # ===============================
+        # (3) Action is a string
+        # ===============================
         if isinstance(action, str):
             code = action.strip().upper()
-            kw = de.keyword or ""  # e.g. "PatientName", "StudyInstanceUID"
 
+            # File-meta elements do NOT have .keyword reliably → check
+            kw = getattr(de, "keyword", None)
+
+            # --------------- KEEP ----------------
             if code == "KEEP":
-                # Leave unchanged
                 new_val = old_val
 
+            # --------------- PSEUDO ----------------
             elif code == "PSEUDO":
                 new_val = pseudo_pid
-                ds.__setattr__(kw, new_val)
+                if kw and tag in ds:
+                    ds.__setattr__(kw, new_val)
+                elif tag in ds.file_meta:
+                    ds.file_meta[tag].value = new_val
 
+            # --------------- NEWUID ----------------
             elif code == "NEWUID":
                 new_val = UID(generate_uid())
-                ds.__setattr__(kw, new_val)
+                if tag in ds:
+                    ds[tag].value = new_val
+                elif tag in ds.file_meta:
+                    ds.file_meta[tag].value = new_val
 
+            # --------------- PSEUDOUID ----------------
             elif code == "PSEUDOUID":
                 kind_map = {
                     "StudyInstanceUID": "study",
                     "SeriesInstanceUID": "series",
                     "FrameOfReferenceUID": "for",
+                    "MediaStorageSOPInstanceUID": "meta",
                 }
                 kind = kind_map.get(kw, "uid")
                 new_val = make_pseudo_uid(pseudo_pid, salt, kind)
-                ds.__setattr__(kw, new_val)
 
+                if tag in ds:
+                    ds[tag].value = new_val
+                elif tag in ds.file_meta:
+                    ds.file_meta[tag].value = new_val
+
+            # --------------- Literal ----------------
             else:
-                # Literal replacement
                 new_val = action
-                ds.__setattr__(kw, new_val)
-
-        else:
-            # Unsupported action type - keep original
-            new_val = old_val
+                if tag in ds:
+                    ds[tag].value = new_val
+                elif tag in ds.file_meta:
+                    ds.file_meta[tag].value = new_val
 
         audit[attr_name] = (old_val, new_val)
 
-    # Handle private tags according to profile
+    # ===============================
+    # Handle private tags globally
+    # ===============================
     if not profile.get("KeepPrivateTags", False):
         ds.remove_private_tags()
 
+    # ===============================
     # Pixel blackout
-    #ds = blackout_pixels_if_needed(ds, profile)
+    # ===============================
+    # ds = blackout_pixels_if_needed(ds, profile)
 
-    # Return pseudo_pid so it can be used in filenames if desired
     return ds, audit, pseudo_pid
 
 # ------------------------------ FILE NAMING --------------------------------
