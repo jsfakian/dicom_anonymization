@@ -22,6 +22,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+NO_RULE = object()  # sentinel to distinguish "no rule" from "null" in JSON
 NAME_TO_KEYWORD: Dict[str, str] = {}
 for _tag, entry in DicomDictionary.items():
     # entry = (VR, VM, name, is_retired, keyword)
@@ -29,6 +30,23 @@ for _tag, entry in DicomDictionary.items():
     keyword = entry[4]
     if name and keyword:
         NAME_TO_KEYWORD[name] = keyword
+
+def build_normalized_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Map cleaned DICOM Attribute Name -> action from profile.
+
+    Profile keys are human-readable DICOM names ("Patient's Name"),
+    possibly with weird spaces or zero-width chars.
+    We normalize them with _clean_attr_name and use that as lookup.
+    """
+    norm: Dict[str, Any] = {}
+    for k, v in profile.items():
+        if k in PROFILE_FLAGS:
+            continue
+        cleaned = _clean_attr_name(k)
+        norm[cleaned] = v
+    return norm
+
 
 # =========================== USER-EDITABLE CONFIG ============================
 
@@ -135,9 +153,8 @@ def _clean_attr_name(name: str) -> str:
     """
     if not isinstance(name, str):
         name = str(name)
-    # remove zero-width spaces and similar
-    name = name.replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
-    # collapse whitespace
+    for ch in ["\u200b", "\u200c", "\u200d", "\xa0"]:
+        name = name.replace(ch, "")
     parts = name.split()
     return " ".join(parts)
 
@@ -165,63 +182,82 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
     Keys in the JSON are DICOM Attribute Names (e.g. "Patient's Name"),
     which are mapped to pydicom keywords via keyword_for_name().
     """
+
     audit: Dict[str, Tuple[Any, Any]] = {}
 
     # Pseudonymous PatientID used for PSEUDO / PSEUDOUID
     real_pid = str(getattr(ds, "PatientID", "UNKNOWN"))
     pseudo_pid = make_pseudo_patient_id(real_pid, salt)
 
-    # Apply each rule in the JSON profile
-    for attr_name_raw, action in profile.items():
-        # Skip global flags, they are handled separately
-        if attr_name_raw in PROFILE_FLAGS:
+    # Build normalized profile mapping: cleaned attribute name -> action
+    norm_profile = build_normalized_profile(profile)
+
+    # Iterate over a copy of keys since we may delete tags
+    for tag in list(ds.keys()):
+        de = ds[tag]
+
+        # We'll handle private tags globally later
+        if de.tag.is_private:
             continue
 
+        attr_name_raw = de.name           # e.g. "Patient's Name"
         attr_name = _clean_attr_name(attr_name_raw)
-        kw = keyword_for_name(attr_name)  # map "Patient's Name" -> "PatientName"
-        if not kw:
-            # Unknown or non-standard attribute name; skip safely
+
+        # Distinguish between "no rule at all" and "rule with null"
+        action = norm_profile.get(attr_name, NO_RULE)
+
+        old_val = de.value
+        new_val = old_val  # default: keep as-is
+
+        # 1) No rule in profile -> KEEP unchanged
+        if action is NO_RULE:
+            audit[attr_name] = (old_val, new_val)
+            if attr_name == "Group Length":
+                print(f"{attr_name} tag {de.tag} and is action NO_RULE: {action == NO_RULE}.")
+                print(f"{attr_name}: {audit[attr_name]}")
             continue
 
-        old_val = None
-        try:
-            old_val = ds.get(kw).value
-        except:
-            print (f"Warning: could not read attribute '{attr_name}' ({kw});")
-        new_val = old_val  # default if KEEP or unknown action
-
-        # Interpret action
+        # 2) Rule exists and is JSON null -> delete
         if action is None:
-            # null -> delete
-            if kw in ds:
-                del ds[kw]
+            if tag in ds:
+                del ds[tag]
             new_val = "<removed>"
-        elif isinstance(action, str):
+            continue
+
+        # 3) Rule is a string: KEEP / PSEUDO / NEWUID / PSEUDOUID / literal
+        if isinstance(action, str):
             code = action.strip().upper()
+            kw = de.keyword or ""  # e.g. "PatientName", "StudyInstanceUID"
+
             if code == "KEEP":
-                # Do not modify, just record
+                # Leave unchanged
                 new_val = old_val
+
             elif code == "PSEUDO":
                 new_val = pseudo_pid
                 ds.__setattr__(kw, new_val)
+
             elif code == "NEWUID":
                 new_val = UID(generate_uid())
                 ds.__setattr__(kw, new_val)
+
             elif code == "PSEUDOUID":
                 kind_map = {
                     "StudyInstanceUID": "study",
                     "SeriesInstanceUID": "series",
-                    "FrameOfReferenceUID": "for"
+                    "FrameOfReferenceUID": "for",
                 }
                 kind = kind_map.get(kw, "uid")
                 new_val = make_pseudo_uid(pseudo_pid, salt, kind)
                 ds.__setattr__(kw, new_val)
+
             else:
-                # Literal replacement string
+                # Literal replacement
                 new_val = action
                 ds.__setattr__(kw, new_val)
+
         else:
-            # Unknown type -> no change
+            # Unsupported action type - keep original
             new_val = old_val
 
         audit[attr_name] = (old_val, new_val)
@@ -231,11 +267,10 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
         ds.remove_private_tags()
 
     # Pixel blackout
-    ds = blackout_pixels_if_needed(ds, profile)
+    #ds = blackout_pixels_if_needed(ds, profile)
 
     # Return pseudo_pid so it can be used in filenames if desired
     return ds, audit, pseudo_pid
-
 
 # ------------------------------ FILE NAMING --------------------------------
 
