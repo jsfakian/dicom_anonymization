@@ -5,3 +5,4 @@ ANON_*
 build/
 dist/
 sample*
+testSample
