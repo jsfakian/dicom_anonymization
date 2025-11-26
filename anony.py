@@ -405,17 +405,17 @@ def run_pipeline(input_path: str, output_path: str, profile: Dict[str, Any], sal
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="DICOM De-Identification (Pro)")
     p.add_argument("-i", "--input", default=os.path.abspath(os.getcwd()), required=False,
-                   help="DICOM file or directory")
+            help="DICOM file or directory")
     p.add_argument("-o", "--output", default=os.path.abspath(os.getcwd()), required=False,
-                   help="Output directory (default: current working directory)")
+            help="Output directory (default: current working directory)")
     p.add_argument("-p", "--profile-fname", default="GDPR-strict_explicit.json",
-                   help="Anonymization profile filename (explicit JSON)")
+            help="Anonymization profile filename (explicit JSON)")
     p.add_argument("--salt", default=DEFAULT_SALT,
-                   help="Site-specific secret salt for deterministic pseudonyms")
+            help="Site-specific secret salt for deterministic pseudonyms")
     p.add_argument("--gui", dest="gui", action="store_true",
-               help="Enable GUI")
+            help="Enable GUI")
     p.add_argument("--no-gui", dest="gui", action="store_false",
-                help="Disable GUI")
+            help="Disable GUI")
     p.set_defaults(gui=True)
     return p.parse_args()
 
