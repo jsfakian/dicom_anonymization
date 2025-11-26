@@ -168,6 +168,100 @@ def keyword_for_name(attr_name: str) -> str | None:
     return NAME_TO_KEYWORD.get(attr_name)
 
 
+def apply_rule_to_element(container: Dataset, de, norm_profile: Dict[str, Any], audit: Dict[str, Tuple[Any, Any]], pseudo_pid: str, salt: str) -> None:
+    """
+    Apply profile rule to a single DataElement inside `container`.
+    `container` is the Dataset that actually owns `de`.
+    """
+    tag = de.tag
+
+    # Skip private tags here - handled globally at the end if requested.
+    if tag.is_private:
+        return
+
+    # Skip Group Length elements (gggg,0000) - deprecated and not written back
+    if tag.element == 0x0000:
+        return
+
+    attr_name_raw = de.name                 # e.g. "Patient's Name"
+    attr_name = _clean_attr_name(attr_name_raw)
+    action = norm_profile.get(attr_name, NO_RULE)
+
+    old_val = de.value
+    new_val = old_val  # default
+
+    # 1) No rule defined in profile -> keep unchanged
+    if action is NO_RULE:
+        audit[attr_name] = (old_val, new_val)
+        return
+
+    # 2) Profile says null -> delete tag
+    if action is None:
+        # Remove only from this specific container (top-level or nested)
+        if tag in container:
+            del container[tag]
+        new_val = "<removed>"
+        audit[attr_name] = (old_val, new_val)
+        return
+
+    # 3) String action: KEEP / PSEUDO / NEWUID / PSEUDOUID / literal
+    if isinstance(action, str):
+        code = action.strip().upper()
+        kw = getattr(de, "keyword", None) or ""  # e.g. "PatientName"
+
+        if code == "KEEP":
+            new_val = old_val
+
+        elif code == "PSEUDO":
+            new_val = pseudo_pid
+
+        elif code == "NEWUID":
+            new_val = UID(generate_uid())
+
+        elif code == "PSEUDOUID":
+            kind_map = {
+                "StudyInstanceUID": "study",
+                "SeriesInstanceUID": "series",
+                "FrameOfReferenceUID": "for",
+                "MediaStorageSOPInstanceUID": "meta",
+            }
+            kind = kind_map.get(kw, "uid")
+            new_val = make_pseudo_uid(pseudo_pid, salt, kind)
+
+        else:
+            # Literal replacement
+            new_val = action
+
+        # Write back to the same container where we read it from
+        if tag in container:
+            container[tag].value = new_val
+
+        audit[attr_name] = (old_val, new_val)
+        return
+
+    # Fallback: unknown action type → keep as-is
+    audit[attr_name] = (old_val, new_val)
+
+def walk_dataset(dset: Dataset, norm_profile: Dict[str, Any], audit: Dict[str, Tuple[Any, Any]], pseudo_pid: str, salt: str) -> None:
+    """
+    Recursively walk through a Dataset (including nested sequences)
+    and apply profile rules to each element.
+    """
+    # We iterate over a copy of keys because we might delete elements.
+    for tag in list(dset.keys()):
+        de = dset[tag]
+
+        # Apply profile to this element first
+        apply_rule_to_element(dset, de, norm_profile, audit, pseudo_pid, salt)
+
+        # If element still exists and is a Sequence, recurse into its items
+        if tag in dset:
+            de = dset[tag]
+            if de.VR == "SQ":
+                for item in de.value:
+                    if isinstance(item, Dataset):
+                        walk_dataset(item)
+
 def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[Dataset, Dict[str, Tuple[Any, Any]], str]:
     """
     Anonymize a DICOM dataset according to an explicit JSON profile.
@@ -193,112 +287,19 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
     # Cleaned rule map: human attribute name → action
     norm_profile = build_normalized_profile(profile)
 
-    # Combine file_meta + dataset elements
-    iterable = chain(list(ds.file_meta), list(ds.iterall()))
+    # 1) Handle file_meta separately (not recursive, rarely has SQ)
+    for tag in list(ds.file_meta.keys()):
+        de = ds.file_meta[tag]
+        apply_rule_to_element(ds.file_meta, de, norm_profile, audit, pseudo_pid, salt)
 
-    for de in iterable:
-        tag = de.tag
+    # 2) Walk main dataset recursively (handles nested tags)
+    walk_dataset(ds, norm_profile, audit, pseudo_pid, salt)
 
-        # ===============================
-        # Skip private tags
-        # ===============================
-        if tag.is_private:
-            continue
-
-        # ===============================
-        # Prepare names and lookup action
-        # ===============================
-        attr_name_raw = de.name
-        attr_name = _clean_attr_name(attr_name_raw)
-        action = norm_profile.get(attr_name, NO_RULE)
-
-        old_val = de.value
-        new_val = old_val
-
-        # ===============================
-        # (1) If NO RULE → KEEP
-        # ===============================
-        if action is NO_RULE:
-            audit[attr_name] = (old_val, new_val)
-            continue
-
-        # ===============================
-        # (2) If null → delete
-        # ===============================
-        if action is None:
-            if tag in ds.file_meta:
-                del ds.file_meta[tag]
-            elif tag in ds:
-                del ds[tag]
-
-            new_val = "<removed>"
-            audit[attr_name] = (old_val, new_val)
-            continue
-
-        # ===============================
-        # (3) Action is a string
-        # ===============================
-        if isinstance(action, str):
-            code = action.strip().upper()
-
-            # File-meta elements do NOT have .keyword reliably → check
-            kw = getattr(de, "keyword", None)
-
-            # --------------- KEEP ----------------
-            if code == "KEEP":
-                new_val = old_val
-
-            # --------------- PSEUDO ----------------
-            elif code == "PSEUDO":
-                new_val = pseudo_pid
-                if kw and tag in ds:
-                    ds.__setattr__(kw, new_val)
-                elif tag in ds.file_meta:
-                    ds.file_meta[tag].value = new_val
-
-            # --------------- NEWUID ----------------
-            elif code == "NEWUID":
-                new_val = UID(generate_uid())
-                if tag in ds:
-                    ds[tag].value = new_val
-                elif tag in ds.file_meta:
-                    ds.file_meta[tag].value = new_val
-
-            # --------------- PSEUDOUID ----------------
-            elif code == "PSEUDOUID":
-                kind_map = {
-                    "StudyInstanceUID": "study",
-                    "SeriesInstanceUID": "series",
-                    "FrameOfReferenceUID": "for",
-                    "MediaStorageSOPInstanceUID": "meta",
-                }
-                kind = kind_map.get(kw, "uid")
-                new_val = make_pseudo_uid(pseudo_pid, salt, kind)
-
-                if tag in ds:
-                    ds[tag].value = new_val
-                elif tag in ds.file_meta:
-                    ds.file_meta[tag].value = new_val
-
-            # --------------- Literal ----------------
-            else:
-                new_val = action
-                if tag in ds:
-                    ds[tag].value = new_val
-                elif tag in ds.file_meta:
-                    ds.file_meta[tag].value = new_val
-
-        audit[attr_name] = (old_val, new_val)
-
-    # ===============================
-    # Handle private tags globally
-    # ===============================
+    # 3) Handle private tags globally (after applying explicit rules)
     if not profile.get("KeepPrivateTags", False):
         ds.remove_private_tags()
 
-    # ===============================
-    # Pixel blackout
-    # ===============================
+    # 4) Optional pixel blackout
     # ds = blackout_pixels_if_needed(ds, profile)
 
     return ds, audit, pseudo_pid
