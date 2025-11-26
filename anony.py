@@ -412,8 +412,11 @@ def parse_args() -> argparse.Namespace:
                    help="Anonymization profile filename (explicit JSON)")
     p.add_argument("--salt", default=DEFAULT_SALT,
                    help="Site-specific secret salt for deterministic pseudonyms")
-    p.add_argument("--gui", default=True, action="store_true",
-                   help="Launch a simple GUI to run the pipeline")
+    p.add_argument("--gui", dest="gui", action="store_true",
+               help="Enable GUI")
+    p.add_argument("--no-gui", dest="gui", action="store_false",
+                help="Disable GUI")
+    p.set_defaults(gui=True)
     return p.parse_args()
 
 
