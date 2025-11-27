@@ -87,7 +87,8 @@ def make_pseudo_uid(pid: str, salt: str, kind: str) -> UID:
     """
     h = sha1_hex(salt + f"::UID::{kind}::" + pid)
     suf = pseudo_numeric_suffix(h, digits=12)  # compact but safe
-    return UID(f"{PSEUDO_UID_ROOT}.{suf}")
+    component = str(suf).lstrip("0") or "1"
+    return UID(f"{PSEUDO_UID_ROOT}.{component}")
 
 
 # ------------------------------- PIXEL BLACKOUT ------------------------------
@@ -260,7 +261,7 @@ def walk_dataset(dset: Dataset, norm_profile: Dict[str, Any], audit: Dict[str, T
             if de.VR == "SQ":
                 for item in de.value:
                     if isinstance(item, Dataset):
-                        walk_dataset(item)
+                        walk_dataset(item, norm_profile, audit, pseudo_pid, salt)
 
 def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[Dataset, Dict[str, Tuple[Any, Any]], str]:
     """
