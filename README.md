@@ -20,8 +20,7 @@ It supports deterministic pseudonymization, UID remapping, pixel blackout of bur
 
 ## Installation
 
-### For Windows installation see INSTALL.md:  
-➡️ [INSTALL.md](INSTALL.md)
+### For Windows go to [INSTALL.md](INSTALL.md)
 
 ### LINUX installation
 
