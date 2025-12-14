@@ -1,10 +1,10 @@
 # Installation Guide (Windows)
 
-This guide explains how to install **Git**, clone the repository, install **Python**, and run the project using a **virtual environment** on Windows.
+This guide explains how to install **Git**, clone the repository, and run the project on Windows.
 
 ---
 
-## 1. Install Git
+## 1. Install Git (Only once)
 
 Git is required to download (clone) the project from GitHub.
 
@@ -50,7 +50,7 @@ You should see something like: `git version 2.x.x`
 
 ![Open PowerShell](screenshots/powershell.png)
 
-## 2. Clone the Repository
+## 2. Clone the Repository (Only once)
 
 ### Choose a folder where you want the project to live
 
@@ -62,7 +62,7 @@ cd dicom_anonymization
 
 ![Clone the repository](screenshots/clone_repo2.png)
 
-## 3. Run the Application
+## 3. Run the Application (Many times)
 
 Open dicom_anonymization folder and double-click on DICOM-DeID.exe
 
