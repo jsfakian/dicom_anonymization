@@ -22,11 +22,33 @@ Open **PowerShell** and run: `git --version`
 
 You should see something like: `git version 2.x.x`
 
+### Git Installation Screenshots
+
+<img src="screenshots/git_install.png" width="400">
+<img src="screenshots/git_install2.png" width="400">
+<img src="screenshots/git_install3.png" width="400">
+<img src="screenshots/git_install4.png" width="400">
+<img src="screenshots/git_install5.png" width="400">
+<img src="screenshots/git_install6.png" width="400">
+<img src="screenshots/git_install7.png" width="400">
+<img src="screenshots/git_install8.png" width="400">
+<img src="screenshots/git_install9.png" width="400">
+<img src="screenshots/git_install10.png" width="400">
+<img src="screenshots/git_install11.png" width="400">
+<img src="screenshots/git_install12.png" width="400">
+<img src="screenshots/git_install13.png" width="400">
+<img src="screenshots/git_install14.png" width="400">
+<img src="screenshots/git_install15.png" width="400">
+<img src="screenshots/git_install16.png" width="400">
+<img src="screenshots/git_install17.png" width="400">
+
 ### How to Open PowerShell
 
 1. Click the **Start** button (or press the **Windows key**)
 2. Type **PowerShell**
 3. Click **Windows PowerShell**
+
+![Open PowerShell](screenshots/powershell.png)
 
 ## 2. Clone the Repository
 
@@ -38,7 +60,9 @@ git clone https://github.com/jsfakian/dicom_anonymization.git
 cd dicom_anonymization
 ```
 
+![Clone the repository](screenshots/clone_repo2.png)
+
 ## 3. Run the Application
 
-Open **PowerShell** and run: `python anony.py`
+Open dicom_anonymization folder and double-click on DICOM-DeID.exe
 
