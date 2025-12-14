@@ -18,13 +18,9 @@ Git is required to download (clone) the project from GitHub.
 5. Finish installation
 
 ### Verify Git installation
-Open **PowerShell** and run:
-```git --version
-```
+Open **PowerShell** and run: `git --version`
 
-You should see something like:
-```git version 2.x.x
-```
+You should see something like: `git version 2.x.x`
 
 ### How to Open PowerShell
 
@@ -37,12 +33,12 @@ You should see something like:
 ### Choose a folder where you want the project to live
 
 Open **PowerShell** and run:
-```git clone https://github.com/jsfakian/dicom_anonymization.git
+```
+git clone https://github.com/jsfakian/dicom_anonymization.git
 cd dicom_anonymization
 ```
 
 ## 3. Run the Application
 
-Open **PowerShell** and run:
-```python anony.py
+Open **PowerShell** and run: `python anony.py`
 
