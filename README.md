@@ -1,98 +1,100 @@
-# DICOM De-Identification
+# DICOM De-Identification Tool
 
-This project provides a **research-grade DICOM anonymization tool** with both **GUI** and **CLI** interfaces.  
-It supports deterministic pseudonymization, UID remapping, pixel blackout of burned-in overlays, audit logging, and customizable anonymization profiles.
+A **DICOM anonymization tool** for research and clinical use. Supports deterministic pseudonymization, customizable anonymization profiles, pixel blackout, audit logging, and multi-platform support.
 
-## Features
+## Key Features
 
 | Feature | Description |
-|--------|-------------|
-| GUI & CLI | Run with a graphical interface or from terminal scripts |
-| Deterministic pseudonymization | Uses a user-defined SALT to generate repeatable pseudonyms |
-| GDPR / Research-friendly profiles | Configurable JSON-based anonymization profiles |
-| Study/Series/Frame UID rewriting | Generates new or pseudonymous UIDs |
-| Pixel blackout | Detects and masks burned-in overlays using edge detection |
-| Multi-file and folder support | Works on single DICOM files or entire study folders |
-| Audit Log | Creates a CSV log showing old vs. new values for traceability |
-| Safe output | Never modifies source data; creates a new ANON_EXPORT_* folder |
+|---------|-------------|
+| **CLI Interface** | Run from terminal with configurable options |
+| **Deterministic Pseudonymization** | Uses a user-defined SALT to generate repeatable, consistent pseudonyms |
+| **Profile-Based Configuration** | Pre-built profiles for GDPR-strict and research-grade anonymization |
+| **UID Management** | Generates new UIDs or pseudonymous UIDs for StudyInstanceUID, SeriesInstanceUID, etc. |
+| **Pixel Blackout** | Detects and masks burned-in text overlays on DICOM images using edge detection |
+| **Batch Processing** | Works on single DICOM files or entire folder hierarchies |
+| **Audit Trail** | CSV log tracks all transformations (old values → new values, per tag) |
+| **Safe Output** | Never modifies source data; creates timestamped `ANON_EXPORT_*` folder |
 
 ---
 
 ## Installation
 
-### For Windows go to [INSTALL.md](INSTALL.md)
+See [INSTALL.md](INSTALL.md) for detailed setup instructions on Windows, macOS, and Linux.
 
-### LINUX installation
-
-Requires Python 3.8+.
-
-Install dependencies (if a requirements file exists):
-pip install -r requirements.txt
-
-Or install the package in editable mode:
-pip install -e .
-
-```
+**Quick Setup:**
+```bash
 python3 -m venv .venv
-source .venv/bin/activate        # macOS/Linux
-.\.venv\Scripts\activate         # Windows
+source .venv/bin/activate           # On Windows: .\.venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-## Make it executable
+---
 
-```
-python -m venv .venv
-source .venv/bin/activate          # Windows: .\.venv\Scripts\activate
-pip install --upgrade pip wheel
-pip install pydicom numpy opencv-python pyinstaller
-```
+## Project Files
 
-```
-pyinstaller --noconfirm --onefile --windowed \
-  --name DICOM-DeID anony.py
-```
+Here's what each file does, so you know which tool to use:
 
-## GUI Usage
+| File | Purpose |
+|------|---------|
+| **`anonymizer_pro.py`** | ⭐ **MAIN TOOL** — Use this to anonymize DICOM files |
+| `GDPR-strict.json` | Anonymization profile for maximum de-identification (legal/public use) |
+| `research-pseudonymized.json` | Anonymization profile for research use (keeps clinical dates) |
+| `requirements.txt` | List of Python packages needed (installed during setup) |
+| `README.md` | This file — overview and documentation |
+| `INSTALL.md` | Step-by-step installation guide |
+| `dump_dicom_metadata.py` | **Utility** — View all tags in a DICOM file (debugging) |
+| `compare_dicom_images.py` | **Utility** — Compare original vs anonymized DICOM files |
+| `validator.py` | **Utility** — Validate anonymized files |
+| `sample1/` & `sample2/` | **Sample Data** — Test DICOM files for trying out the tool |
+| `testSample/` | **Sample Data** — Small test DICOM file |
+| `screenshots/` | Visual guides for installation (non-technical users) |
 
-To start the graphical application:
+**Recommendation:** Focus on `anonymizer_pro.py`. The other Python files are utilities for troubleshooting and are optional.
+
+---
+
+## Usage
+
+### Command-Line Interface
+
+Anonymize a DICOM file or folder:
 
 ```bash
-python anony.py
-```
-
-| Field                | Description                                              |
-| -------------------- | -------------------------------------------------------- |
-| **Input**            | A DICOM file *or* a folder containing a series           |
-| **Profile JSON**     | An anonymization configuration file                      |
-| **SALT**             | Secret string to ensure deterministic pseudonyms         |
-| **Output Directory** | The directory where the anonymized results will be saved |
-
-## Command-line usage
-
-Basic example:
-python anony.py --input data.csv --output data.anonymized.csv \
-    --columns name,email --strategy hash --salt my-secret-salt
-
-Typical options (may vary slightly depending on implementation):
-
-- --input PATH         Input dir
-- --output PATH        Output dir
-- --profile-fname FILE JSON config that defines per-column rules
-- --salt VALUE         Salt or key for deterministic transformations
-
-```
-python anony.py \
-  -i /path/to/dicom_or_folder \
-  -o /path/to/output \
+python anonymizer_pro.py \
+  -i /path/to/input_dicom_or_folder \
   -p GDPR-strict.json \
-  --salt "my-secret-salt" 
+  --salt "your-secret-salt-phrase"
 ```
 
-## Example Profiles
+**Arguments:**
+- `-i, --input` — Path to DICOM file or folder (required)
+- `-p, --profile` — JSON profile file (default: `GDPR-strict.json`)
+- `--salt` — Secret phrase for deterministic pseudonymization (default: random)
+- `-o, --output` — Output directory (default: `ANON_EXPORT_YYYYMMDD_HHMMSS`)
 
-### GDPR-strict.json
+**Examples:**
 
+```bash
+# Anonymize a single DICOM file
+python anonymizer_pro.py -i patient.dcm -p GDPR-strict.json --salt "my-secret"
+
+# Anonymize an entire study folder with research profile
+python anonymizer_pro.py -i /data/studies/001 -p research-pseudonymized.json --salt "my-secret"
+
+# Use default GDPR-strict profile
+python anonymizer_pro.py -i data.dcm --salt "my-secret"
 ```
+
+---
+
+## Anonymization Profiles
+
+Profiles control which DICOM tags are removed, replaced, or pseudonymized. Choose a profile that matches your use case:
+
+### `GDPR-strict.json` (Maximum De-Identification)
+Removes or replaces all personally identifiable information. **Use for public sharing or non-research environments.**
+
+```json
 {
   "PatientName": null,
   "PatientBirthDate": null,
@@ -108,12 +110,14 @@ python anony.py \
 }
 ```
 
-### research_pseudo.json
+### `research-pseudonymized.json` (Research-Grade)
+Keeps clinically relevant data while pseudonymizing identifiers. **Safe for research with proper governance.**
 
-```
+```json
 {
   "PatientName": "PSEUDO",
   "PatientSex": "UNKNOWN",
+  "PatientBirthDate": null,
   "RetainStudyDate": true,
   "PixelBlackout": false,
   "KeepPrivateTags": true,
@@ -122,34 +126,62 @@ python anony.py \
 }
 ```
 
-## Output Structure
+**Profile Tag Rules:**
+- `null` — Remove tag entirely
+- `"STRING"` — Replace with fixed string
+- `"PSEUDO"` — Generate deterministic pseudonym based on SALT
+- `"PSEUDOUID"` — Generate deterministic UID based on SALT
+- `true/false` — Special actions (e.g., `PixelBlackout: true` masks burned-in text)
+
+---
+
+## Output
+
+Anonymized files are saved in a timestamped folder:
 
 ```
-ANON_EXPORT_20250110_153012/
- ├── anonymization_log.csv
- └── DICOM/
-     └── PX3F91AD/
-         ├── PX3F91AD_20250110_153012_S001_I0001.dcm
-         ├── PX3F91AD_20250110_153012_S001_I0002.dcm
-         └── ...
+ANON_EXPORT_20260303_143012/
+├── anonymization_log.csv          # Detailed transformation log
+└── DICOM/
+    └── PX3F91AD/                  # Patient pseudonym
+        ├── PX3F91AD_20260303_143012_S001_I0001.dcm
+        ├── PX3F91AD_20260303_143012_S001_I0002.dcm
+        └── ...
 ```
 
-## Safety & reproducibility
+The **anonymization_log.csv** contains:
+- Original and new DICOM tag values
+- Patient pseudonym
+- Study/Series UIDs
+- Transformation timestamp
 
-- Use a secret salt/seed to make transformations deterministic across runs
-- Test with a small dataset
-- Keep mapping tables (if generated) secure; they may re-identify users
+---
 
-## Logging & errors
+## Security & Best Practices
 
-- Tool logs progress and a summary of transformations applied
-- Invalid rows are either skipped, logged, or fail fast depending on config
+1. **Use a Secret SALT** — Choose a strong, unique phrase. Store it securely (password manager, HSM, etc.)
+2. **Test First** — Always test with a small dataset before processing large studies
+3. **Reproducibility** — The same SALT produces the same pseudonyms across runs
+4. **Audit Log Security** — The CSV log is unencrypted; protect it like PHI
+5. **Version Control** — Keep profiles in version control; rotate profiles with SALT changes
+
+---
+
+## Troubleshooting
+
+- **"Invalid DICOM file"** — File may be corrupted or encrypted. Try extracting with `dcmdump` or another DICOM tool.
+- **"Profile not found"** — Ensure JSON file is in the working directory or provide full path.
+- **"Permission denied"** — Ensure read access to input folder and write access to output directory.
+
+---
 
 ## Contributing
 
-- Open issues for bugs or feature requests
-- Add tests for new anonymization strategies
-- Keep privacy and reproducibility considerations in mind when changing behavior
+- Report bugs or request features via GitHub Issues
+- Contributions welcome — please test thoroughly and document behavior changes
+- Keep privacy and reproducibility in mind when proposing changes
+
+---
 
 ## License
 
