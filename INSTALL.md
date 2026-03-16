@@ -40,25 +40,25 @@ You should see something like: `Python 3.x.x`
 
 If you see this, Python is installed correctly!
 
-### Python Installation Screenshots
+### Git Installation Screenshots
 
-![Python installation step 1](screenshots/git_install.png)
-![Python installation step 2](screenshots/git_install2.png)
-![Python installation step 3](screenshots/git_install3.png)
-![Python installation step 4](screenshots/git_install4.png)
-![Python installation step 5](screenshots/git_install5.png)
-![Python installation step 6](screenshots/git_install6.png)
-![Python installation step 7](screenshots/git_install7.png)
-![Python installation step 8](screenshots/git_install8.png)
-![Python installation step 9](screenshots/git_install9.png)
-![Python installation step 10](screenshots/git_install10.png)
-![Python installation step 11](screenshots/git_install11.png)
-![Python installation step 12](screenshots/git_install12.png)
-![Python installation step 13](screenshots/git_install13.png)
-![Python installation step 14](screenshots/git_install14.png)
-![Python installation step 15](screenshots/git_install15.png)
-![Python installation step 16](screenshots/git_install16.png)
-![Python installation step 17](screenshots/git_install17.png)
+![Git installation step 1](screenshots/git_install.png)
+![Git installation step 2](screenshots/git_install2.png)
+![Git installation step 3](screenshots/git_install3.png)
+![Git installation step 4](screenshots/git_install4.png)
+![Git installation step 5](screenshots/git_install5.png)
+![Git installation step 6](screenshots/git_install6.png)
+![Git installation step 7](screenshots/git_install7.png)
+![Git installation step 8](screenshots/git_install8.png)
+![Git installation step 9](screenshots/git_install9.png)
+![Git installation step 10](screenshots/git_install10.png)
+![Git installation step 11](screenshots/git_install11.png)
+![Git installation step 12](screenshots/git_install12.png)
+![Git installation step 13](screenshots/git_install13.png)
+![Git installation step 14](screenshots/git_install14.png)
+![Git installation step 15](screenshots/git_install15.png)
+![Git installation step 16](screenshots/git_install16.png)
+![Git installation step 17](screenshots/git_install17.png)
 
 ---
 

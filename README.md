@@ -1,6 +1,92 @@
-# DICOM De-Identification Tool
+# Technical Description of the DICOM Anonymization Tool
 
-A **DICOM anonymization tool** for research and clinical use. Supports deterministic pseudonymization, customizable anonymization profiles, pixel blackout, audit logging, and multi-platform support.
+## Overview
+
+A Python CLI tool for anonymizing DICOM medical imaging files. It removes or transforms patient-identifiable metadata while preserving the technical data needed for imaging research and quality assurance. Original files are never modified — anonymized output is written to a separate timestamped directory.
+
+### How It Works
+
+DICOM files contain two types of data:
+
+- **Pixel data** — the medical images themselves (preserved)
+- **Metadata (DICOM attributes)** — patient, exam, scanner, and acquisition details (selectively removed or pseudonymized)
+
+The tool reads each file, applies a JSON-based anonymization profile to the metadata, and writes the result to the output directory.
+
+### Anonymization Profiles
+
+Two profiles are provided:
+
+| Profile | Use Case |
+| ------- | -------- |
+| **GDPR-strict** | Removes all direct and institutional identifiers; recommended for sharing outside the originating institution |
+| **Research pseudonymized** | Removes personal identifiers but retains selected technical metadata needed for imaging research |
+
+### What Gets Removed
+
+Direct patient identifiers are deleted entirely, including:
+
+- Patient names, IDs, birth dates, and addresses
+- Contact information and physician identifiers
+- Accession numbers
+
+### Pseudonymization
+
+Some identifiers cannot simply be deleted because they maintain the internal structure of the dataset — images must stay grouped by study, series must stay ordered, and cross-image references must remain valid.
+
+For these, the tool generates deterministic pseudonymous values using a hashing algorithm combined with a user-supplied secret **salt**. This means:
+
+- Dataset relationships remain intact
+- Pseudonyms are consistent across multiple runs with the same salt
+- Original values cannot be reconstructed
+
+This applies to both free-text identifiers and DICOM UIDs (Study Instance UID, Series Instance UID, SOP Instance UID, Frame of Reference UID).
+
+### Technical Metadata Preserved
+
+Attributes required for imaging research are kept, including:
+
+- Scanner acquisition parameters and image geometry
+- Slice thickness and spacing
+- Tube voltage and current
+- Radiation dose indicators (CTDIvol, DLP)
+
+### Pipeline Architecture
+
+| Step | Component | Description |
+| ---- | --------- | ----------- |
+| 1 | Input discovery | Finds DICOM files to process |
+| 2 | DICOM parsing | Reads dataset and metadata |
+| 3 | Policy engine | Applies rules from the JSON profile |
+| 4 | UID pseudonymization | Generates deterministic pseudonymous UIDs |
+| 5 | Sequence traversal | Recursively handles nested DICOM structures |
+| 6 | Pixel processing *(optional)* | Masks burned-in text annotations |
+| 7 | Output writer | Saves anonymized files |
+| 8 | Audit logger | Records all transformations |
+
+### JSON Profile Format
+
+Profiles map DICOM attribute names to anonymization actions:
+
+```json
+{
+  "Patient's Name": null,
+  "Patient ID": null,
+  "Study Instance UID": "PSEUDOUID",
+  "Series Instance UID": "PSEUDOUID",
+  "Slice Thickness": "KEEP"
+}
+```
+
+| Action | Effect |
+| ------ | ------ |
+| `KEEP` | Attribute value is preserved unchanged |
+| `null` | Attribute is removed from the file |
+| `"PSEUDO"` | Replaced with a deterministic pseudonym (based on salt) |
+| `"PSEUDOUID"` | Replaced with a deterministic pseudonymous UID (based on salt) |
+| `"NEWUID"` | Replaced with a newly generated random UID |
+
+---
 
 ## Key Features
 
@@ -22,6 +108,7 @@ A **DICOM anonymization tool** for research and clinical use. Supports determini
 See [INSTALL.md](INSTALL.md) for detailed setup instructions on Windows, macOS, and Linux.
 
 **Quick Setup:**
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate           # On Windows: .\.venv\Scripts\activate
@@ -67,6 +154,7 @@ python anonymizer_pro.py \
 ```
 
 **Arguments:**
+
 - `-i, --input` — Path to DICOM file or folder (required)
 - `-p, --profile` — JSON profile file (default: `GDPR-strict.json`)
 - `--salt` — Secret phrase for deterministic pseudonymization (default: random)
@@ -92,6 +180,7 @@ python anonymizer_pro.py -i data.dcm --salt "my-secret"
 Profiles control which DICOM tags are removed, replaced, or pseudonymized. Choose a profile that matches your use case:
 
 ### `GDPR-strict.json` (Maximum De-Identification)
+
 Removes or replaces all personally identifiable information. **Use for public sharing or non-research environments.**
 
 ```json
@@ -111,6 +200,7 @@ Removes or replaces all personally identifiable information. **Use for public sh
 ```
 
 ### `research-pseudonymized.json` (Research-Grade)
+
 Keeps clinically relevant data while pseudonymizing identifiers. **Safe for research with proper governance.**
 
 ```json
@@ -127,6 +217,7 @@ Keeps clinically relevant data while pseudonymizing identifiers. **Safe for rese
 ```
 
 **Profile Tag Rules:**
+
 - `null` — Remove tag entirely
 - `"STRING"` — Replace with fixed string
 - `"PSEUDO"` — Generate deterministic pseudonym based on SALT
@@ -150,6 +241,7 @@ ANON_EXPORT_20260303_143012/
 ```
 
 The **anonymization_log.csv** contains:
+
 - Original and new DICOM tag values
 - Patient pseudonym
 - Study/Series UIDs
