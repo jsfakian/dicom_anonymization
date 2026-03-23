@@ -53,7 +53,7 @@ DEFAULT_SALT = "CHANGE-ME-SALT-RHYTHM-UOC-2025"
 
 # Numeric root for pseudonymous UIDs (must be numeric dotted string).
 # Use an enterprise/organization root if you have one; this is an example.
-PSEUDO_UID_ROOT = "1.2.826.0.1.3680043.10.54321"
+PSEUDO_UID_ROOT = "1.3.6.1.4.1.37476.9000.207.999"
 
 # ========================= END USER-EDITABLE CONFIG ==========================
 
