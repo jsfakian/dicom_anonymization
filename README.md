@@ -13,14 +13,11 @@ DICOM files contain two types of data:
 
 The tool reads each file, applies a JSON-based anonymization profile to the metadata, and writes the result to the output directory.
 
-### Anonymization Profiles
+### Flexible JSON-based anonymization profiles
 
-Two profiles are provided:
+Enables explicit control of every DICOM tag (KEEP / null / PSEUDO / PSEUDOUID), allowing user-custom profiles. Allows selective retention of any research or dosimetry-relevant metadata
 
-| Profile | Use Case |
-| ------- | -------- |
-| **GDPR-strict** | Removes all direct and institutional identifiers; recommended for sharing outside the originating institution |
-| **Research pseudonymized** | Removes personal identifiers but retains selected technical metadata needed for imaging research |
+A strict, GDPR-oriented profile is provided as a ready-to-use template, ensuring that all direct and indirect identifiers are appropriately removed or pseudonymized while maintaining compliance with data protection requirements. Users are encouraged to utilize this sample profile as the baseline for their anonymization tasks. The supplied profile is designed to be sufficiently conservative for safe data sharing while still preserving essential structural information, such as UID relationships, required for dataset integrity, and can be easily adapted by modifying selected fields in the JSON configuration.
 
 ### What Gets Removed
 
@@ -177,7 +174,7 @@ python anonymizer_pro.py -i data.dcm --salt "my-secret"
 
 ## Anonymization Profiles
 
-Profiles control which DICOM tags are removed, replaced, or pseudonymized. Choose a profile that matches your use case:
+Profiles control which DICOM tags are removed, replaced, or pseudonymized.
 
 ### `GDPR-strict.json` (Maximum De-Identification)
 
@@ -196,23 +193,6 @@ Removes or replaces all personally identifiable information. **Use for public sh
   "PixelBlackout": true,
   "KeepPrivateTags": false,
   "RetainStudyDate": false
-}
-```
-
-### `research-pseudonymized.json` (Research-Grade)
-
-Keeps clinically relevant data while pseudonymizing identifiers. **Safe for research with proper governance.**
-
-```json
-{
-  "PatientName": "PSEUDO",
-  "PatientSex": "UNKNOWN",
-  "PatientBirthDate": null,
-  "RetainStudyDate": true,
-  "PixelBlackout": false,
-  "KeepPrivateTags": true,
-  "StudyInstanceUID": "PSEUDOUID",
-  "SeriesInstanceUID": "PSEUDOUID"
 }
 ```
 
