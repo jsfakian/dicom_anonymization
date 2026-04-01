@@ -264,6 +264,10 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
             new_val = new_pid
             ds.__setattr__(keyword, new_val)
             new_val_safe = _audit_safe_value(keyword, new_val)
+        elif isinstance(action, str) and action.upper() == "KEEP":
+            # Leave the attribute unchanged
+            new_val = old_val
+            new_val_safe = old_val_safe
         else:
             new_val = action
             ds.__setattr__(keyword, new_val)
