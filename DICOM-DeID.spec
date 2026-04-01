@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['anony.py'],
+    ['anonymizer_pro.py'],
     pathex=[],
     binaries=[],
     datas=[],
