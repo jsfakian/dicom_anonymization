@@ -33,11 +33,14 @@ import hashlib
 import multiprocessing as mp
 from typing import Tuple, Dict, Any, Optional, List
 
+import re
 import numpy as np
 from pydicom import dcmread
 from pydicom.dataset import Dataset
 from pydicom.uid import UID, generate_uid
 from pydicom.errors import InvalidDicomError
+from pydicom.datadict import keyword_for_tag, tag_for_keyword
+from pydicom.tag import Tag, BaseTag
 import cv2
 import json
 import threading
@@ -88,6 +91,47 @@ EXCLUDE_FROM_AUDIT = {
 MAX_AUDIT_VALUE_LEN = 512
 
 # ============================ END AUDIT CONTROLS ==============================
+
+
+# ----------------------------- TAG KEY RESOLVER ------------------------------
+
+# Matches pure tag: "(0010,0010)" or "0010,0010"
+_PURE_TAG_RE = re.compile(r'^\(?([0-9A-Fa-f]{4})[,\s]([0-9A-Fa-f]{4})\)?$')
+# Matches combined: "PatientName (0010,0010)"
+_COMBINED_RE = re.compile(r'^.+\s+\(([0-9A-Fa-f]{4}),([0-9A-Fa-f]{4})\)$')
+
+
+def _resolve_profile_key(key: str):
+    """
+    Accepts a profile JSON key in any of these formats and returns (ds_key, audit_label):
+      - pydicom keyword        : 'PatientName'
+      - pure tag               : '(0010,0010)' or '0010,0010'
+      - combined keyword+tag   : 'PatientName (0010,0010)'
+    ds_key is a pydicom keyword string (preferred) or a Tag object.
+    audit_label is the original key string for audit logging.
+    """
+    k = key.strip()
+
+    m = _PURE_TAG_RE.match(k)
+    if m:
+        tag = Tag(int(m.group(1), 16), int(m.group(2), 16))
+        kw = keyword_for_tag(tag)
+        # Only use the keyword if pydicom can resolve it back to a tag (rules out
+        # retired / repeating-group keywords like "OverlayData" in pydicom 3.x).
+        return (kw if kw and tag_for_keyword(kw) is not None else tag), key
+
+    m = _COMBINED_RE.match(k)
+    if m:
+        tag = Tag(int(m.group(1), 16), int(m.group(2), 16))
+        kw = keyword_for_tag(tag)
+        return (kw if kw and tag_for_keyword(kw) is not None else tag), key
+
+    # Plain string: only valid if pydicom recognises it as a DICOM keyword.
+    # Keys with spaces (e.g. "Fractionation Notes") are DICOM descriptions, not
+    # keywords — return None so the caller can skip them gracefully.
+    if tag_for_keyword(k) is not None:
+        return k, key
+    return None, key
 
 
 # --------------------------- PSEUDONYMIZATION CORE ---------------------------
@@ -167,8 +211,7 @@ def blackout_pixels_if_needed(ds: Dataset, profile: Dict[str, Any]) -> Dataset:
         out = _blackout_on_2d(px)
     elif px.ndim == 3:
         frames = []
-        for i in range(px.shape[0]):
-            frames.append(_blackout_on_2d(px[i]))
+        frames.extend(_blackout_on_2d(px[i]) for i in range(px.shape[0]))
         out = np.stack(frames, axis=0)
     else:
         return ds
@@ -234,44 +277,81 @@ def anonymize_dataset(ds: Dataset, profile: Dict[str, Any], salt: str) -> Tuple[
         if key in AUDIT_EXCLUDE:
             continue
 
-        # In this script, JSON keys are expected to be pydicom keywords (e.g., StudyInstanceUID).
-        keyword = key
+        # Accept both pydicom keywords and DICOM tag strings like "(0010,0010)"
+        ds_key, audit_label = _resolve_profile_key(key)
+        if ds_key is None:
+            continue  # unresolvable key (e.g. plain-text description with spaces)
+        # For keyword-based actions (PSEUDOUID kind_map etc.) we need the keyword string
+        keyword = ds_key if isinstance(ds_key, str) else None
+
+        # Determine where to read/write this tag:
+        #   group 0002 (File Meta)    → ds.file_meta
+        #   group 0000 (Command Set)  → read/delete from ds, but never write
+        #                               (Command Set elements cannot exist in stored DICOM files)
+        #   everything else           → ds
+        if keyword:
+            kw_tag = tag_for_keyword(keyword)
+            tag_group = Tag(kw_tag).group if kw_tag is not None else None
+        else:
+            tag_group = ds_key.group if isinstance(ds_key, BaseTag) else None
+
+        if tag_group == 0x0002 and ds.file_meta is not None:
+            target = ds.file_meta
+        else:
+            target = ds
+        read_only = tag_group == 0x0000  # Command Set: audit only, no writes
 
         # Capture old value safely (avoid PixelData, etc.)
-        old_val = ds.get(keyword) if keyword in ds else None
-        old_val_safe = _audit_safe_value(keyword, old_val)
+        old_val = target.get(ds_key) if ds_key in target else None
+        old_val_safe = _audit_safe_value(audit_label, old_val)
 
         if action is None:
-            if keyword in ds:
-                del ds[keyword]
+            if ds_key in target:
+                del target[ds_key]
             new_val = "<removed>"
             new_val_safe = new_val
         elif action == "NEWUID":
             new_val = UID(generate_uid())
-            ds.__setattr__(keyword, new_val)
-            new_val_safe = _audit_safe_value(keyword, new_val)
+            if not read_only:
+                if keyword:
+                    target.__setattr__(keyword, new_val)
+                elif ds_key in target:
+                    target[ds_key].value = new_val
+            new_val_safe = _audit_safe_value(audit_label, new_val)
         elif action == "PSEUDOUID":
             kind_map = {
                 "StudyInstanceUID": "study",
                 "SeriesInstanceUID": "series",
                 "FrameOfReferenceUID": "for"
             }
-            kind = kind_map.get(keyword, "uid")
+            kind = kind_map.get(keyword or "", "uid")
             new_val = make_pseudo_uid(new_pid, salt, kind)
-            ds.__setattr__(keyword, new_val)
-            new_val_safe = _audit_safe_value(keyword, new_val)
+            if not read_only:
+                if keyword:
+                    target.__setattr__(keyword, new_val)
+                elif ds_key in target:
+                    target[ds_key].value = new_val
+            new_val_safe = _audit_safe_value(audit_label, new_val)
         elif isinstance(action, str) and action.upper() == "PSEUDO":
             new_val = new_pid
-            ds.__setattr__(keyword, new_val)
-            new_val_safe = _audit_safe_value(keyword, new_val)
+            if not read_only:
+                if keyword:
+                    target.__setattr__(keyword, new_val)
+                elif ds_key in target:
+                    target[ds_key].value = new_val
+            new_val_safe = _audit_safe_value(audit_label, new_val)
         elif isinstance(action, str) and action.upper() == "KEEP":
             # Leave the attribute unchanged
             new_val = old_val
             new_val_safe = old_val_safe
         else:
             new_val = action
-            ds.__setattr__(keyword, new_val)
-            new_val_safe = _audit_safe_value(keyword, new_val)
+            if not read_only:
+                if keyword:
+                    target.__setattr__(keyword, new_val)
+                elif ds_key in target:
+                    target[ds_key].value = new_val
+            new_val_safe = _audit_safe_value(audit_label, new_val)
 
         # IMPORTANT: Never leak binary payloads to audit
         audit[keyword] = (old_val_safe, new_val_safe)
@@ -384,7 +464,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("-i", "--input", default=os.path.abspath(os.getcwd()), required=False, help="DICOM file or directory")
     p.add_argument("-o", "--output", default=os.path.abspath(os.getcwd()), required=False,
                    help="DICOM out directory (default: current working directory)")
-    p.add_argument("-p", "--profile-fname", default="GDPR-strict.json",
+    p.add_argument("-p", "--profile-fname", default="GDPR-strict_explicit.json",
                    help="Anonymization profile filename")
     p.add_argument("--salt", default=DEFAULT_SALT, help="Site-specific secret salt for deterministic pseudonyms")
     p.add_argument("--gui", default=True, action="store_true", help="Launch a simple GUI to run the pipeline")
