@@ -532,6 +532,9 @@
     "PixelData (7FE0,0010)": "KEEP",
     "OverlayData (6000,3000)": null,
     "CurveData (5000,3000)": null,
+    "Instance Creation Date (0008,0012)": null,
+    "Instance Creation Time (0008,0013)": null,
+    "Implementation Version Name (0002,0013)": null,
     "PrivateAttributes (*,*)": "KEEP",
     "KeepPrivateTags": true,
     "PixelBlackout": false
