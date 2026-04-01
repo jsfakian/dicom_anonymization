@@ -21,3 +21,5 @@ __pycache__/
 *.egg
 .venv/
 .venv-win/
+.venv-win-build/
+.venv_build/

@@ -176,6 +176,69 @@ python anonymizer_pro.py -i data.dcm --salt "my-secret"
 
 ---
 
+## Building the Windows executable
+
+The repository already includes a PyInstaller spec file named `DICOM-DeID.spec` that builds the Windows GUI executable from `anonymizer_pro.py` and names the output `DICOM-DeID.exe`.
+
+### Option 1: Build with the provided PowerShell script
+
+A helper script is included below to automate the Windows build:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build_dicom_deid.ps1
+```
+
+What the script does:
+
+- detects a working Python 3 launcher (`py -3`, `python`, or `python3`)
+- creates a dedicated virtual environment named `.venv-win-build`
+- bootstraps `pip` with `ensurepip` so the build still works even when the venv was created without `pip`
+- installs `requirements.txt`
+- runs PyInstaller with `DICOM-DeID.spec`
+- writes the final executable to `dist\DICOM-DeID.exe`
+
+Useful options:
+
+```powershell
+# Remove old build/, dist/, and venv first
+powershell -ExecutionPolicy Bypass -File .\build_dicom_deid.ps1 -Clean
+
+# Build without reinstalling requirements
+powershell -ExecutionPolicy Bypass -File .\build_dicom_deid.ps1 -SkipRequirements
+
+# Ignore the spec file and build directly from anonymizer_pro.py
+powershell -ExecutionPolicy Bypass -File .\build_dicom_deid.ps1 -UseSpec:$false
+```
+
+### Option 2: Build manually
+
+```powershell
+py -3 -m venv .venv-win-build
+.\.venv-win-build\Scripts\python.exe -m ensurepip --upgrade
+.\.venv-win-build\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
+.\.venv-win-build\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv-win-build\Scripts\python.exe -m PyInstaller --clean .\DICOM-DeID.spec
+```
+
+The executable will be created at:
+
+```text
+.\dist\DICOM-DeID.exe
+```
+
+### Notes
+
+- Build the executable on Windows.
+- The current spec builds a windowed application (`console=False`).
+- The current spec file points to `anonymizer_pro.py`, and the script uses `tkinter` for the GUI.
+- If Windows blocks script execution, run PowerShell once with:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+---
+
 ## Anonymization Profiles
 
 Profiles control which DICOM tags are removed, replaced, or pseudonymized.

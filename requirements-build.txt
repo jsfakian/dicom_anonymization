@@ -1,0 +1,5 @@
+# Build/runtime dependencies for DICOM-DeID on Windows
+numpy
+pydicom
+opencv-python
+pyinstaller
